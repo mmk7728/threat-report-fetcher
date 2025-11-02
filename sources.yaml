@@ -1,0 +1,108 @@
+defaults:
+  user_agent: "ThreatReportFetcher/1.0 (+contact:sec-team@example.com)"
+  timeout: 30
+  retries: 3
+
+dest_root: "security-reports"  # S3の配下パスに合わせたい場合、workflow側のsync先と合わせる
+
+sources:
+
+  - id: ipa-top10
+    name: IPA セキュリティ10大脅威
+    type: list_latest
+    start_url: "https://www.ipa.go.jp/security/10threats/index.html"
+    selector: "a[href]"
+    regex: "10threats.*(pdf|PDF)$"
+    keep: 3
+    out_dir: "IPA/Top10"
+
+  - id: jpcert-quarterly
+    name: JPCERT/CC インシデント対応レポート（四半期）
+    type: list_latest
+    start_url: "https://www.jpcert.or.jp/research/"
+    selector: "a[href]"
+    regex: "(?:インシデント報告|Incident Report).*(pdf|PDF)$"
+    keep: 6
+    out_dir: "JPCERT/Quarterly"
+
+  - id: nict-nicter
+    name: NICTER観測レポート（年次）
+    type: list_latest
+    start_url: "https://www.nict.go.jp/cybersecurity/nicter/report.html"
+    selector: "a[href]"
+    regex: "(NICTER|観測レポート).*(pdf|PDF)$"
+    keep: 5
+    out_dir: "NICT/Nicter"
+
+  - id: trendmicro-roundup
+    name: トレンドマイクロ セキュリティラウンドアップ
+    type: list_latest
+    start_url: "https://www.trendmicro.com/ja_jp/research.html"
+    selector: "a[href]"
+    regex: "(ラウンドアップ|Roundup).*(pdf|PDF)$"
+    keep: 8
+    out_dir: "TrendMicro/Roundup"
+
+  - id: mandiant-mtrends
+    name: Mandiant M-Trends（年次）
+    type: list_latest
+    start_url: "https://www.mandiant.com/resources"
+    selector: "a[href]"
+    regex: "M-?Trends.*(pdf|PDF)$"
+    keep: 5
+    out_dir: "Mandiant/M-Trends"
+
+  - id: crowdstrike-gtr
+    name: CrowdStrike Global Threat Report（年次）
+    type: list_latest
+    start_url: "https://www.crowdstrike.com/resources/"
+    selector: "a[href]"
+    regex: "Global-?Threat-?Report.*(pdf|PDF)$"
+    keep: 5
+    out_dir: "CrowdStrike/GTR"
+
+  - id: unit42-qtr
+    name: Palo Alto Networks Unit42 Threat Intelligence（四半期）
+    type: list_latest
+    start_url: "https://unit42.paloaltonetworks.com/"
+    selector: "a[href]"
+    regex: "(Quarterly|Threat Intelligence Report).*(pdf|PDF)$"
+    keep: 8
+    out_dir: "PaloAlto/Unit42"
+
+  - id: ibm-xforce-index
+    name: IBM X-Force Threat Intelligence Index（年次）
+    type: list_latest
+    start_url: "https://www.ibm.com/reports/threat-intelligence"
+    selector: "a[href]"
+    regex: "(Threat Intelligence Index).*(pdf|PDF)$"
+    keep: 5
+    out_dir: "IBM/X-Force"
+
+  - id: enisa-etl
+    name: ENISA Threat Landscape（年次）
+    type: list_latest
+    start_url: "https://www.enisa.europa.eu/topics/threats-and-trends/threat-landscape"
+    selector: "a[href]"
+    regex: "(Threat Landscape).*(pdf|PDF)$"
+    keep: 5
+    out_dir: "ENISA/ETL"
+
+  - id: kaspersky-ksb
+    name: Kaspersky Security Bulletin（年次/四半期）
+    type: list_latest
+    start_url: "https://securelist.com/"
+    selector: "a[href]"
+    regex: "(Kaspersky Security Bulletin|KSB).*(pdf|PDF)$"
+    keep: 8
+    out_dir: "Kaspersky/KSB"
+
+  # 例：固定URL（direct）
+  - id: europol-iocta
+    name: Europol IOCTA（年次）
+    type: list_latest
+    start_url: "https://www.europol.europa.eu/publications-events/main-reports"
+    selector: "a[href]"
+    regex: "(IOCTA).*(pdf|PDF)$"
+    keep: 5
+    out_dir: "Europol/IOCTA"
