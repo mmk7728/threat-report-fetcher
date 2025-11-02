@@ -3,106 +3,140 @@ defaults:
   timeout: 30
   retries: 3
 
-dest_root: "security-reports"  # S3の配下パスに合わせたい場合、workflow側のsync先と合わせる
+dest_root: "security-reports"
 
 sources:
 
+  # --- IPA: 10大脅威
+  # 以前: regex が 10threats.*(pdf) に限定 → ページのPDFリンク表記が年度で揺れるため0件に
+  # 対策: aテキスト or URL に「10大脅威 / 10threats」を含む + .pdf を優先
   - id: ipa-top10
     name: IPA セキュリティ10大脅威
     type: list_latest
     start_url: "https://www.ipa.go.jp/security/10threats/index.html"
     selector: "a[href]"
-    regex: "10threats.*(pdf|PDF)$"
-    keep: 3
+    regex: "(10大脅威|10threats).*(\\.pdf)$"
+    keep: 5
     out_dir: "IPA/Top10"
 
+  # --- JPCERT/CC: インシデント報告対応レポート（統合後もPDFが公開されるケースあり）
+  # 以前: 「research/」配下にしていた → 年度PDFは /pr/YYYY/IR_Report*.pdf に置かれることがある
+  # 対策: 公式のアーカイブページから IR_Report*.pdf を直接抽出
   - id: jpcert-quarterly
-    name: JPCERT/CC インシデント対応レポート（四半期）
+    name: JPCERT/CC インシデント報告対応レポート（四半期・アーカイブ）
     type: list_latest
-    start_url: "https://www.jpcert.or.jp/research/"
+    start_url: "https://www.jpcert.or.jp/ir/report.html"
     selector: "a[href]"
-    regex: "(?:インシデント報告|Incident Report).*(pdf|PDF)$"
-    keep: 6
+    regex: "IR_Report.*\\.pdf$"
+    keep: 8
     out_dir: "JPCERT/Quarterly"
 
+  # --- NICT: NICter 年次レポート
+  # 以前: 古いURLで 404
+  # 対策: 現行のNICterレポートページに変更（日本語版）。PDF直リンクを抽出
   - id: nict-nicter
     name: NICTER観測レポート（年次）
     type: list_latest
-    start_url: "https://www.nict.go.jp/cybersecurity/nicter/report.html"
+    start_url: "https://csl.nict.go.jp/nicter-report.html"
     selector: "a[href]"
-    regex: "(NICTER|観測レポート).*(pdf|PDF)$"
+    regex: "\\.pdf$"
     keep: 5
     out_dir: "NICT/Nicter"
 
+  # --- トレンドマイクロ: ラウンドアップ（国内）
+  # 以前: research.html + (pdf) 縛り → 多くがフォーム経由DLでPDF直リンク取得不可
+  # 対策: (pdf) 縛りを外し、ラウンドアップ系ページ（HTML）も保存対象に
   - id: trendmicro-roundup
-    name: トレンドマイクロ セキュリティラウンドアップ
+    name: トレンドマイクロ セキュリティラウンドアップ（国内）
     type: list_latest
     start_url: "https://www.trendmicro.com/ja_jp/research.html"
     selector: "a[href]"
-    regex: "(ラウンドアップ|Roundup).*(pdf|PDF)$"
+    regex: "(ラウンドアップ|Roundup|サイバーリスクラウンドアップ)"
     keep: 8
     out_dir: "TrendMicro/Roundup"
 
+  # --- Mandiant: M-Trends（多くがフォームゲートでPDF直リンク不可）
+  # 対策: (pdf) 縛りを外してHTMLランディングも保存
+    # （PDF直取得が必要な場合は個別フォーム→メール配布のため自動化は別手段が必要）
   - id: mandiant-mtrends
     name: Mandiant M-Trends（年次）
     type: list_latest
     start_url: "https://www.mandiant.com/resources"
     selector: "a[href]"
-    regex: "M-?Trends.*(pdf|PDF)$"
+    regex: "M-?Trends"
     keep: 5
     out_dir: "Mandiant/M-Trends"
 
+  # --- CrowdStrike: Global Threat Report（フォームゲート対策としてHTMLも許容）
   - id: crowdstrike-gtr
     name: CrowdStrike Global Threat Report（年次）
     type: list_latest
     start_url: "https://www.crowdstrike.com/resources/"
     selector: "a[href]"
-    regex: "Global-?Threat-?Report.*(pdf|PDF)$"
+    regex: "Global-?Threat-?Report"
     keep: 5
     out_dir: "CrowdStrike/GTR"
 
+  # --- Palo Alto Networks Unit 42: 四半期/年次のThreat Intelligence（HTML許容）
   - id: unit42-qtr
     name: Palo Alto Networks Unit42 Threat Intelligence（四半期）
     type: list_latest
     start_url: "https://unit42.paloaltonetworks.com/"
     selector: "a[href]"
-    regex: "(Quarterly|Threat Intelligence Report).*(pdf|PDF)$"
+    regex: "(Quarterly|Threat Intelligence Report|Threat Intelligence)"
     keep: 8
     out_dir: "PaloAlto/Unit42"
 
+  # --- IBM X-Force: Threat Intelligence Index（フォームゲート対策でHTML許容）
   - id: ibm-xforce-index
     name: IBM X-Force Threat Intelligence Index（年次）
     type: list_latest
     start_url: "https://www.ibm.com/reports/threat-intelligence"
     selector: "a[href]"
-    regex: "(Threat Intelligence Index).*(pdf|PDF)$"
+    regex: "(Threat Intelligence Index)"
     keep: 5
     out_dir: "IBM/X-Force"
 
+  # --- ENISA: Threat Landscape（旧topics配下は404が出やすい）
+  # 対策: 2025の個別出版ページへ。PDF直リンク抽出（安定）
   - id: enisa-etl
     name: ENISA Threat Landscape（年次）
     type: list_latest
-    start_url: "https://www.enisa.europa.eu/topics/threats-and-trends/threat-landscape"
+    start_url: "https://www.enisa.europa.eu/publications/enisa-threat-landscape-2025"
     selector: "a[href]"
-    regex: "(Threat Landscape).*(pdf|PDF)$"
+    regex: "\\.pdf$"
     keep: 5
     out_dir: "ENISA/ETL"
 
+  # --- Kaspersky: KSB/各種年次（HTML許容）
   - id: kaspersky-ksb
     name: Kaspersky Security Bulletin（年次/四半期）
     type: list_latest
     start_url: "https://securelist.com/"
     selector: "a[href]"
-    regex: "(Kaspersky Security Bulletin|KSB).*(pdf|PDF)$"
+    regex: "(Kaspersky Security Bulletin|KSB|Threat Landscape|Ransomware).*"
     keep: 8
     out_dir: "Kaspersky/KSB"
 
-  # 例：固定URL（direct）
+  # --- Europol: IOCTA（PDF直リンクあり／安定）
+  # 以前: 一覧ページ配下。PDF直リンクが拾えない場合がある
+  # 対策: 2024個別ページに寄せて .pdf を抽出
   - id: europol-iocta
     name: Europol IOCTA（年次）
     type: list_latest
-    start_url: "https://www.europol.europa.eu/publications-events/main-reports"
+    start_url: "https://www.europol.europa.eu/publication-events/main-reports/internet-organised-crime-threat-assessment-iocta-2024"
     selector: "a[href]"
-    regex: "(IOCTA).*(pdf|PDF)$"
+    regex: "\\.pdf$"
     keep: 5
     out_dir: "Europol/IOCTA"
+
+  # --- 追加: Fortinet Global Threat Landscape（PDF直リンクが提供されやすい）
+  - id: fortinet-gtl
+    name: Fortinet Global Threat Landscape（年次/半期）
+    type: list_latest
+    start_url: "https://www.fortinet.com/resources/reports/threat-landscape-report"
+    selector: "a[href]"
+    # 公式のPDFパスは /content|/dam/ 配下に threat-landscape-report-*.pdf が多い
+    regex: "(threat-landscape-report).*\\.pdf$"
+    keep: 5
+    out_dir: "Fortinet/GTL"
