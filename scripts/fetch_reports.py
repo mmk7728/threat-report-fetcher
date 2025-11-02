@@ -18,6 +18,14 @@ import requests
 from bs4 import BeautifulSoup
 from dateutil import parser as dtparser
 from tqdm import tqdm
+import subprocess
+from contextlib import contextmanager
+
+try:
+    from playwright.sync_api import sync_playwright
+    PLAYWRIGHT_AVAILABLE = True
+except Exception:
+    PLAYWRIGHT_AVAILABLE = False
 
 LOG = logging.getLogger("fetch-reports")
 
@@ -83,6 +91,31 @@ def sanitize_filename(name: str) -> str:
     # URL末尾やTitleから安全なファイル名を生成
     name = re.sub(r"[^\w\-.]+", "_", name, flags=re.UNICODE)
     return name.strip("._") or "file"
+
+# >>> ADDED: HTML→PDF 変換（URLを直接レンダリング）
+def render_url_to_pdf(url: str, pdf_path: Path, timeout_ms: int = 60000) -> bool:
+    """
+    Returns True if PDF was generated.
+    """
+    if not PLAYWRIGHT_AVAILABLE:
+        LOG.warning("Playwright not available; skip HTML->PDF for %s", url)
+        return False
+    ensure_dir(pdf_path.parent)
+    try:
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch(args=["--no-sandbox"])
+            context = browser.new_context()
+            page = context.new_page()
+            page.goto(url, wait_until="networkidle", timeout=timeout_ms)
+            page.emulate_media(media="screen")
+            # A4 / 背景含める
+            page.pdf(path=str(pdf_path), format="A4", print_background=True)
+            context.close()
+            browser.close()
+        return pdf_path.exists() and pdf_path.stat().st_size > 0
+    except Exception as e:
+        LOG.warning("HTML->PDF failed for %s: %s", url, e)
+        return False
 
 def guess_ext_from_ct(resp: requests.Response, url: str) -> str:
     ct = resp.headers.get("Content-Type", "").lower()
@@ -160,6 +193,9 @@ def main():
     # まだ1件も落ちなくても index.json を書けるように先に作成
     ensure_dir(out_root / dest_root)
 
+    session = make_session(defaults)
+    records_for_index = []
+    
     for src in sources:
         sid = src["id"]
         name = src.get("name", sid)
@@ -234,6 +270,29 @@ def main():
                         "fetched_at": ts_utc(),
                     }
                     records_for_index.append(rec)
+                    
+                    # >>> ADDED: HTMLだったら、同じ場所にPDFも生成して追記
+                    if ext == ".html":
+                        pdf_name = re.sub(r"\.html?$", "", base_name, flags=re.IGNORECASE) + ".pdf"
+                        pdf_path = out_dir / pdf_name
+                        # URLを直接レンダリング（相対パスやJSにも強い）
+                        if render_url_to_pdf(url, pdf_path):
+                            LOG.info(f"  pdf:    {pdf_path}")
+                            # 目録にPDFとして別レコード追加
+                            records_for_index.append({
+                                "source_id": sid,
+                                "source_name": name,
+                                "title": f"{text} (PDF snapshot)",
+                                "url": url,
+                                "saved_path": str(pdf_path.as_posix()),
+                                "sha256": sha256_bytes(pdf_path.read_bytes()),
+                                "content_type": "application/pdf",
+                                "published_at": pub_at,
+                                "fetched_at": ts_utc(),
+                                "generated_from": str(save_path.as_posix()),
+                            })
+                        else:
+                            LOG.warning(f"  pdf:    failed to generate for {url}")
 
                 except Exception as e:
                     LOG.warning(f"  skip {url}: {e}")
