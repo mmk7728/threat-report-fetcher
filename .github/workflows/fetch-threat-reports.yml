@@ -1,0 +1,75 @@
+name: Fetch Security Threat Reports
+
+on:
+  workflow_dispatch:
+  schedule:
+    # GitHubはUTC。JST(月曜 06:00) ≒ UTC(日曜 21:00)
+    - cron: "0 21 * * 0"   # 毎週（月曜朝JST向け）
+    - cron: "0 21 1 * *"   # 毎月1日（月初JST向け・半期/年次の取りこぼし対策）
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write    # index.jsonのコミットに必要（後段の"Commit & Push"を使う場合）
+      id-token: write    # AWS OIDC を使う場合
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: |
+          python -m pip install -U pip
+          pip install -r requirements.txt
+
+      - name: Fetch reports
+        env:
+          # 任意：社内プロキシや追加ヘッダが必要な場合に設定
+          HTTP_PROXY: ${{ secrets.HTTP_PROXY }}
+          HTTPS_PROXY: ${{ secrets.HTTPS_PROXY }}
+          EXTRA_HEADERS_JSON: ${{ secrets.EXTRA_HEADERS_JSON }}
+        run: |
+          python scripts/fetch_reports.py --config sources.yaml --out data
+
+      - name: Upload artifact (fallback / for inspection)
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-reports
+          path: data
+
+      # ======= 任意：S3へ同期 =======
+      - name: Configure AWS credentials (optional)
+        if: ${{ secrets.AWS_ROLE_ARN != '' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION || 'ap-northeast-1' }}
+
+      - name: Sync to S3 (optional)
+        if: ${{ secrets.AWS_S3_BUCKET != '' }}
+        run: |
+          aws s3 sync ./data s3://${{ secrets.AWS_S3_BUCKET }}/security-reports/ --delete --only-show-errors
+
+      - name: Invalidate CloudFront (optional)
+        if: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID != '' }}
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --paths "/security-reports/*"
+
+      # ======= 任意：変更をリポジトリへ反映（index.jsonなどを直コミット） =======
+      - name: Commit & Push data updates (optional)
+        if: ${{ github.event_name != 'pull_request' }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if [ -n "$(git status --porcelain data)" ]; then
+            git add data
+            git commit -m "chore: update fetched security reports"
+            git push
+          fi
