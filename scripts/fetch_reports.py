@@ -35,6 +35,8 @@ def load_yaml(path: Path) -> dict:
         return yaml.safe_load(f)
 
 def save_json(path: Path, obj):
+    # 親ディレクトリが無いと FileNotFoundError になるため必ず作成
+    ensure_dir(path.parent)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(obj, f, ensure_ascii=False, indent=2)
 
@@ -155,6 +157,8 @@ def main():
 
     out_root = Path(args.out)
     ensure_dir(out_root)
+    # まだ1件も落ちなくても index.json を書けるように先に作成
+    ensure_dir(out_root / dest_root
 
     for src in sources:
         sid = src["id"]
