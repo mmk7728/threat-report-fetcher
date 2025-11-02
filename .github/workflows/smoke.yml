@@ -1,0 +1,14 @@
+name: Smoke Test
+on:
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Hello
+        run: echo "Hello from Actions at $(date -u)"
+      - name: Sleep
+        run: sleep 5
+      - name: Done
+        run: echo "Done"
