@@ -158,7 +158,7 @@ def main():
     out_root = Path(args.out)
     ensure_dir(out_root)
     # まだ1件も落ちなくても index.json を書けるように先に作成
-    ensure_dir(out_root / dest_root
+    ensure_dir(out_root / dest_root)
 
     for src in sources:
         sid = src["id"]
