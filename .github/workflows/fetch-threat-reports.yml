@@ -1,6 +1,9 @@
 name: Fetch Security Threat Reports
+
 on:
   workflow_dispatch:
+  schedule:
+    - cron: "0 21 * * 0"
 
 jobs:
   fetch:
